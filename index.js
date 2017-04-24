@@ -20,7 +20,7 @@ client.on('end', () => {
     console.log('disconnected from server');
 });
 
-module.export = {
+module.exports = {
     "connect" : function() {
         return net.connect({
                 port: 6667,
