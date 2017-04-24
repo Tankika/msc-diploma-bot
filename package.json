@@ -1,0 +1,20 @@
+{
+  "name": "msc-diploma-bot",
+  "version": "1.0.0",
+  "description": "Twitch IRC bot application for Diploma Thesis Design 1 subject of Budapest University of Technology and Economics",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Tamás Perlaki",
+  "license": "MIT",
+  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tankika/msc-diploma.git"
+  },
+  "dependencies": {
+    "net": "^1.0.2"
+  }
+}
