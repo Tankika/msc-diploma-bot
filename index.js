@@ -1,7 +1,7 @@
 const net = require('net');
 
 const NICK = 'tankikabot',
-    PING_PATTERN = /^PING :([a-zA-Z\\.]+)$/;
+    PING_PATTERN = /PING :([a-zA-Z\\.]+)/;
 
 function Bot(channel) {
     
