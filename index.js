@@ -30,8 +30,8 @@ function Bot(channel) {
                 console.log(`${channel}: Matched command: ${name}`);
                 sendMessage(commands[name]);
             } else {
-                const message = `${channel}: Unknown command: ${name}`;
-                console.log(message);
+                const message = `Unknown command: ${name}`;
+                console.log(`${channel}: ${message}`);
                 sendMessage(message);
             }
         }
@@ -50,6 +50,7 @@ function Bot(channel) {
     });
 
     this.addCommand = addCommand;
+    this.removeCommand = removeCommand;
     this.resetCommands = resetCommands;
     this.runCommand = runCommand;
 
@@ -65,6 +66,12 @@ function Bot(channel) {
         console.log(`${channel}: Adding command: !${name} - ${text}`);
 
         commands[name] = text;
+    }
+
+    function removeCommand(name) {
+        console.log(`${channel}: Removing command: !${name}`);
+        
+        delete commands[name];
     }
 
     function resetCommands() {
