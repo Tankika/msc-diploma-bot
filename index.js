@@ -1,4 +1,6 @@
 const net = require('net');
+const moment = require('moment');
+const _ = require('lodash');
 
 const NICK = 'tankikabot',
     PING_PATTERN = /PING :([a-zA-Z\\.]+)/;
@@ -7,8 +9,9 @@ function Bot(channel) {
     
     const COMMAND_PATTERN = new RegExp(`PRIVMSG #${channel} :!(.*)\\s*$`);
 
-    var commands = {};
-    var client = net.connect({
+    let commands = {};
+    let timers = {};
+    const client = net.connect({
             port: 6667,
             host: 'irc.chat.twitch.tv'
         }, () => {
@@ -49,20 +52,22 @@ function Bot(channel) {
         console.log(`${channel}: Disconnected`);
     });
 
-    this.addCommand = addCommand;
+    this.setCommand = setCommand;
     this.removeCommand = removeCommand;
     this.resetCommands = resetCommands;
-    this.runCommand = runCommand;
+    this.setCommand = setCommand;
+    this.setTimer = setTimer;
+    this.removeTimer = removeTimer;
 
     function send(message) {
         client.write(`${message}\r\n`);
-    };
+    }
 
     function sendMessage(message) {
         client.write(`PRIVMSG #${channel} :${message}\r\n`);
-    };
+    }
 
-    function addCommand(name, text) {
+    function setCommand(name, text) {
         console.log(`${channel}: Adding command: !${name} - ${text}`);
 
         commands[name] = text;
@@ -87,6 +92,32 @@ function Bot(channel) {
         }
 
         sendMessage(commands[name]);
+    }
+    
+    function setTimer(name, timeInMinutes, commandNames) {
+        console.log(`${channel}: Adding timer: ${name}`);
+
+        if(name in timers) {
+            console.log(`${channel}: Timer(${name}) already exists, removing first`);
+            removeTimer(name);
+        }
+
+        const intervalObject = setInterval(() => {
+            console.log(`${channel}: Timer triggered: ${name}`);
+
+            _.each(commandNames, commandName => runCommand(commandName))
+        }, moment.duration(timeInMinutes, 'minutes').asMilliseconds()); 
+        
+        timers[name] = intervalObject;
+
+        console.log(`${channel}: Added timer: ${name}`);
+    }
+
+    function removeTimer(name) {
+        console.log(`${channel}: Removing timer: ${name}`);
+
+        clearInterval(timers[name]);
+        delete timers[name];
     }
 }
 
