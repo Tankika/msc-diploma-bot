@@ -11,6 +11,7 @@ function Bot(channel) {
 
     let commands = {};
     let timers = {};
+    let aliases = {};
     const client = net.connect({
             port: 6667,
             host: 'irc.chat.twitch.tv'
@@ -32,6 +33,15 @@ function Bot(channel) {
             if(name in commands) {
                 console.log(`${channel}: Matched command: ${name}`);
                 sendMessage(commands[name]);
+            } else if(name in aliases) {
+                const commandName = aliases[name];
+
+                if(!commandName in commands) {
+                    throw new Error(`${channel}: ${commandName} was not found, associated with alias ${name}`);
+                }
+
+                console.log(`${channel}: Matched alias: ${name} for command: ${commandName}`);
+                sendMessage(commands[commandName]);
             } else {
                 const message = `Unknown command: ${name}`;
                 console.log(`${channel}: ${message}`);
@@ -55,9 +65,11 @@ function Bot(channel) {
     this.setCommand = setCommand;
     this.removeCommand = removeCommand;
     this.resetCommands = resetCommands;
-    this.setCommand = setCommand;
+    this.runCommand = runCommand;
     this.setTimer = setTimer;
     this.removeTimer = removeTimer;
+    this.setAlias = setAlias;
+    this.removeAlias = removeAlias;
 
     function send(message) {
         client.write(`${message}\r\n`);
@@ -74,8 +86,11 @@ function Bot(channel) {
     }
 
     function removeCommand(name) {
+        if(!name in commands) {
+            return;
+        }
+
         console.log(`${channel}: Removing command: !${name}`);
-        
         delete commands[name];
     }
 
@@ -114,10 +129,29 @@ function Bot(channel) {
     }
 
     function removeTimer(name) {
+        if(!name in timers) {
+            return;
+        }
+
         console.log(`${channel}: Removing timer: ${name}`);
 
         clearInterval(timers[name]);
         delete timers[name];
+    }
+
+    function setAlias(name, commandName) {
+        console.log(`${channel}: Adding alias: !${name} - !${commandName}`);
+
+        aliases[name] = commandName;
+    }
+
+    function removeAlias(name) {
+        if(!name in aliases) {
+            return;
+        }
+
+        console.log(`${channel}: Removing alias: ${name}`);
+        delete aliases[name];
     }
 }
 
