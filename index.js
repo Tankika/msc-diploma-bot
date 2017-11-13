@@ -2,7 +2,7 @@ const net = require('net');
 const moment = require('moment');
 const _ = require('lodash');
 
-function Bot(channel, eventLogger) {
+function Bot(channel, userId, eventLogger) {
 
     const NICK = 'tankikabot';
     const PING_PATTERN = /PING :([a-zA-Z\\.]+)/;
@@ -18,13 +18,14 @@ function Bot(channel, eventLogger) {
     }, () => {
         send('PASS oauth:9lnozel9qqgasq4cs1tc405c6weixg');
         send(`NICK ${NICK}`);
+        send('CAP REQ :twitch.tv/tags');
         send(`JOIN #${channel}`);
 
-        eventLogger.info(`Joined chat room`, {channel: channel});
+        eventLogger.info(`Joined chat room`, {channel: channel, userId: userId});
     });
 
     client.on('data', (data) => {
-        eventLogger.debug(`Data arrived`, {channel: channel, data: data.toString()});
+        eventLogger.debug(`Data arrived`, {channel: channel, userId: userId, data: data.toString()});
     });
 
     client.on('data', (data) => {
@@ -32,7 +33,7 @@ function Bot(channel, eventLogger) {
         if(matches) {
             var name = matches[1];
             if(name in commands) {
-                eventLogger.debug('Matched command', {channel: channel, command: name});
+                eventLogger.debug('Matched command', {channel: channel, userId: userId, command: name});
                 sendMessage(commands[name]);
             } else if(name in aliases) {
                 const commandName = aliases[name];
@@ -41,10 +42,10 @@ function Bot(channel, eventLogger) {
                     throw new Error(`${channel}: ${commandName} was not found, associated with alias ${name}`);
                 }
 
-                eventLogger.debug('Matched alias', {channel: channel, alias: name, command: commandName});
+                eventLogger.debug('Matched alias', {channel: channel, userId: userId, alias: name, command: commandName});
                 sendMessage(commands[commandName]);
             } else {
-                eventLogger.debug('Unknown command', {channel: channel, command: name});
+                eventLogger.debug('Unknown command', {channel: channel, userId: userId, command: name});
             }
         }
     });
@@ -52,13 +53,13 @@ function Bot(channel, eventLogger) {
     client.on('data', (data) => {
         var matches = PING_PATTERN.exec(data);
         if(matches) {
-            eventLogger.debug('PONG', {channel: channel});
+            eventLogger.debug('PONG', {channel: channel, userId: userId});
             send(`PONG ${NICK}, ${matches[1]}`);
         }
     });
 
     client.on('end', () => {
-        eventLogger.warn('Left chat room', {channel: channel, channel: channel});
+        eventLogger.warn('Left chat room', {channel: channel, userId: userId, channel: channel, userId: userId});
     });
 
     this.setCommand = setCommand;
@@ -99,12 +100,12 @@ function Bot(channel, eventLogger) {
     
     function setTimer(name, timeInMinutes, commandNames) {
         if(name in timers) {
-            eventLogger.debug('Timer already exists, removing first', {channel: channel, timer: name});
+            eventLogger.debug('Timer already exists, removing first', {channel: channel, userId: userId, timer: name});
             removeTimer(name);
         }
     
         const intervalObject = setInterval(() => {
-            eventLogger.debug('Timer triggered', {channel: channel, timer: name});
+            eventLogger.debug('Timer triggered', {channel: channel, userId: userId, timer: name});
     
             _.each(commandNames, commandName => runCommand(commandName))
         }, moment.duration(timeInMinutes, 'minutes').asMilliseconds()); 
