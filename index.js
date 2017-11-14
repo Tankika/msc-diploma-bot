@@ -1,142 +1,163 @@
 const net = require('net');
+const EventEmitter = require('events');
 const moment = require('moment');
 const _ = require('lodash');
 
-function Bot(channel, userId, eventLogger) {
+class Bot extends EventEmitter {
+    constructor(channel, userId, eventLogger) {
+        super();
 
-    const NICK = 'tankikabot';
-    const PING_PATTERN = /PING :([a-zA-Z\\.]+)/;
-    const COMMAND_PATTERN = new RegExp(`PRIVMSG #${channel} :!(.*)\\s*$`);
+        this._channel = channel;
+        this._userId = userId;
+        this._eventLogger = eventLogger;
+        
+        this._commands = {};
+        this._timers = {};
+        this._aliases = {};
+        
+        this.NICK = 'tankikabot';
+        
+        this.NEW_RAFFLER_EVENT = Symbol('new raffler');
 
-    const commands = {};
-    const timers = {};
-    let aliases = {};
+        const COMMAND_PATTERN = new RegExp(`PRIVMSG #${this._channel} :!(.*)\\s*$`);
+        const PING_PATTERN = /PING :([a-zA-Z\\.]+)/;
+        const RAFFLE_PATTERN = new RegExp(`:([a-zA-Z0-9_]{3,25})!\\1@\\1.tmi.twitch.tv PRIVMSG #${this._channel} :!raffle\\s*`);
+    
+        this._client = net.connect({
+            port: 6667,
+            host: 'irc.chat.twitch.tv'
+        }, () => {
+            this._send('PASS oauth:9lnozel9qqgasq4cs1tc405c6weixg');
+            this._send(`NICK ${this.NICK}`);
+            //this._send('CAP REQ :twitch.tv/tags');
+            this._send(`JOIN #${this._channel}`);
+    
+            this._eventLogger.info(`Joined chat room`, {channel: this._channel, userId: this._userId});
+        });
+    
+        this._client.on('data', data => {
+            this._eventLogger.debug(`Data arrived`, {channel: this._channel, userId: this._userId, data: data.toString()});
+        });
+    
+        this._client.on('data', data => {
+            const matches = COMMAND_PATTERN.exec(data);
 
-    const client = net.connect({
-        port: 6667,
-        host: 'irc.chat.twitch.tv'
-    }, () => {
-        send('PASS oauth:9lnozel9qqgasq4cs1tc405c6weixg');
-        send(`NICK ${NICK}`);
-        send('CAP REQ :twitch.tv/tags');
-        send(`JOIN #${channel}`);
-
-        eventLogger.info(`Joined chat room`, {channel: channel, userId: userId});
-    });
-
-    client.on('data', (data) => {
-        eventLogger.debug(`Data arrived`, {channel: channel, userId: userId, data: data.toString()});
-    });
-
-    client.on('data', (data) => {
-        var matches = COMMAND_PATTERN.exec(data);
-        if(matches) {
-            var name = matches[1];
-            if(name in commands) {
-                eventLogger.debug('Matched command', {channel: channel, userId: userId, command: name});
-                sendMessage(commands[name]);
-            } else if(name in aliases) {
-                const commandName = aliases[name];
-
-                if(!commandName in commands) {
-                    throw new Error(`${channel}: ${commandName} was not found, associated with alias ${name}`);
+            if(matches) {
+                var name = matches[1];
+                if(name in this._commands) {
+                    this._eventLogger.debug('Matched command', {channel: this._channel, userId: this._userId, command: name});
+                    this._sendMessage(this._commands[name]);
+                } else if(name in this._aliases) {
+                    const commandName = this._aliases[name];
+    
+                    if(!commandName in this._commands) {
+                        throw new Error(`${this._channel}: ${commandName} was not found, associated with alias ${name}`);
+                    }
+    
+                    this._eventLogger.debug('Matched alias', {channel: this._channel, userId: this._userId, alias: name, command: commandName});
+                    this._sendMessage(this._commands[commandName]);
+                } else {
+                    this._eventLogger.debug('Unknown command', {channel: this._channel, userId: this._userId, command: name});
                 }
+            }
+        });
+    
+        this._client.on('data', data => {
+            const matches = PING_PATTERN.exec(data);
 
-                eventLogger.debug('Matched alias', {channel: channel, userId: userId, alias: name, command: commandName});
-                sendMessage(commands[commandName]);
-            } else {
-                eventLogger.debug('Unknown command', {channel: channel, userId: userId, command: name});
+            if(matches) {
+                this._eventLogger.debug('PONG', {channel: this._channel, userId: this._userId});
+                this._send(`PONG ${this.NICK}, ${matches[1]}`);
+            }
+        });
+    
+        this._client.on('end', () => {
+            this._eventLogger.warn('Left chat room', {channel: this._channel, userId: this._userId, channel: this._channel, userId: this._userId});
+        });
+
+        this._raffleHandler = data => {
+            const matches = RAFFLE_PATTERN.exec(data);
+
+            if(matches) {
+                this.emit(this.NEW_RAFFLER_EVENT, matches[1]);
             }
         }
-    });
-
-    client.on('data', (data) => {
-        var matches = PING_PATTERN.exec(data);
-        if(matches) {
-            eventLogger.debug('PONG', {channel: channel, userId: userId});
-            send(`PONG ${NICK}, ${matches[1]}`);
-        }
-    });
-
-    client.on('end', () => {
-        eventLogger.warn('Left chat room', {channel: channel, userId: userId, channel: channel, userId: userId});
-    });
-
-    this.setCommand = setCommand;
-    this.removeCommand = removeCommand;
-    this.runCommand = runCommand;
-    this.setTimer = setTimer;
-    this.removeTimer = removeTimer;
-    this.setAlias = setAlias;
-    this.removeAlias = removeAlias;
-    this.resetAliases = resetAliases;
-    
-    function send(message) {
-        client.write(`${message}\r\n`);
     }
     
-    function sendMessage(message) {
-        client.write(`PRIVMSG #${channel} :${message}\r\n`);
+    _send(message) {
+        this._client.write(`${message}\r\n`);
+    }
+
+    _sendMessage(message) {
+        this._client.write(`PRIVMSG #${this._channel} :${message}\r\n`);
+    }
+
+    setCommand(name, text) {
+        this._commands[name] = text;
     }
     
-    function setCommand(name, text) {
-        commands[name] = text;
-    }
-    
-    function removeCommand(name) {
-        if(!name in commands) {
+    removeCommand(name) {
+        if(!name in this._commands) {
             return;
         }
     
-        delete commands[name];
+        delete this._commands[name];
     }
     
-    function runCommand(name) {
-        if(!name in commands) {
-            throw new Error(`Command ${name} is not added to channel ${channel} or not enabled!`);
+    runCommand(name) {
+        if(!name in this._commands) {
+            throw new Error(`Command ${name} is not added to channel ${this._channel} or not enabled!`);
         }
     
-        sendMessage(commands[name]);
+        this._sendMessage(this._commands[name]);
     }
     
-    function setTimer(name, timeInMinutes, commandNames) {
-        if(name in timers) {
-            eventLogger.debug('Timer already exists, removing first', {channel: channel, userId: userId, timer: name});
+    setTimer(name, timeInMinutes, commandNames) {
+        if(name in this._timers) {
+            this._eventLogger.debug('Timer already exists, removing first', {channel: this._channel, userId: this._userId, timer: name});
             removeTimer(name);
         }
     
         const intervalObject = setInterval(() => {
-            eventLogger.debug('Timer triggered', {channel: channel, userId: userId, timer: name});
+            this._eventLogger.debug('Timer triggered', {channel: this._channel, userId: this._userId, timer: name});
     
             _.each(commandNames, commandName => runCommand(commandName))
         }, moment.duration(timeInMinutes, 'minutes').asMilliseconds()); 
         
-        timers[name] = intervalObject;
+        this._timers[name] = intervalObject;
     }
     
-    function removeTimer(name) {
-        if(!name in timers) {
+    removeTimer(name) {
+        if(!name in this._timers) {
             return;
         }
     
-        clearInterval(timers[name]);
-        delete timers[name];
+        clearInterval(this._timers[name]);
+        delete this._timers[name];
     }
     
-    function setAlias(name, commandName) {
-        aliases[name] = commandName;
+    setAlias(name, commandName) {
+        this._aliases[name] = commandName;
     }
     
-    function removeAlias(name) {
-        if(!name in aliases) {
+    removeAlias(name) {
+        if(!name in this._aliases) {
             return;
         }
 
-        delete aliases[name];
+        delete this._aliases[name];
     }
     
-    function resetAliases() {
-        aliases = {};
+    resetAliases() {
+        this._aliases = {};
+    }
+
+    openRaffle() {
+        this._client.on('data', this._raffleHandler);
+    }
+
+    closeRaffle() {
+        this._client.removeListener('data', this._raffleHandler);
     }
 }
 
