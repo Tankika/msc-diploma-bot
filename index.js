@@ -10,7 +10,7 @@ function Bot(channel, userId, eventLogger) {
 
     const commands = {};
     const timers = {};
-    const aliases = {};
+    let aliases = {};
 
     const client = net.connect({
         port: 6667,
@@ -69,6 +69,7 @@ function Bot(channel, userId, eventLogger) {
     this.removeTimer = removeTimer;
     this.setAlias = setAlias;
     this.removeAlias = removeAlias;
+    this.resetAliases = resetAliases;
     
     function send(message) {
         client.write(`${message}\r\n`);
@@ -132,6 +133,10 @@ function Bot(channel, userId, eventLogger) {
         }
 
         delete aliases[name];
+    }
+    
+    function resetAliases() {
+        aliases = {};
     }
 }
 
