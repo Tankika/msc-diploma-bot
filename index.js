@@ -46,7 +46,7 @@ class Bot extends EventEmitter {
                 var name = matches[1];
                 if(name in this._commands) {
                     this._eventLogger.debug('Matched command', {channel: this._channel, userId: this._userId, command: name});
-                    this._sendMessage(this._commands[name]);
+                    this.sendMessage(this._commands[name]);
                 } else if(name in this._aliases) {
                     const commandName = this._aliases[name];
     
@@ -55,7 +55,7 @@ class Bot extends EventEmitter {
                     }
     
                     this._eventLogger.debug('Matched alias', {channel: this._channel, userId: this._userId, alias: name, command: commandName});
-                    this._sendMessage(this._commands[commandName]);
+                    this.sendMessage(this._commands[commandName]);
                 } else {
                     this._eventLogger.debug('Unknown command', {channel: this._channel, userId: this._userId, command: name});
                 }
@@ -88,7 +88,7 @@ class Bot extends EventEmitter {
         this._client.write(`${message}\r\n`);
     }
 
-    _sendMessage(message) {
+    sendMessage(message) {
         this._client.write(`PRIVMSG #${this._channel} :${message}\r\n`);
     }
 
@@ -109,7 +109,7 @@ class Bot extends EventEmitter {
             throw new Error(`Command ${name} is not added to channel ${this._channel} or not enabled!`);
         }
     
-        this._sendMessage(this._commands[name]);
+        this.sendMessage(this._commands[name]);
     }
     
     setTimer(name, timeInMinutes, commandNames) {
