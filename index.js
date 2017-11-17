@@ -18,10 +18,12 @@ class Bot extends EventEmitter {
         this.NICK = 'tankikabot';
         
         this.NEW_RAFFLER_EVENT = Symbol('new raffler');
+        this.VOTE_EVENT = Symbol('vote');
 
         const COMMAND_PATTERN = new RegExp(`PRIVMSG #${this._channel} :!(.*)\\s*$`);
         const PING_PATTERN = /PING :([a-zA-Z\\.]+)/;
         const RAFFLE_PATTERN = new RegExp(`:([a-zA-Z0-9_]{3,25})!\\1@\\1.tmi.twitch.tv PRIVMSG #${this._channel} :!raffle\\s*`);
+        const POLL_PATTERN = new RegExp(`:([a-zA-Z0-9_]{3,25})!\\1@\\1.tmi.twitch.tv PRIVMSG #${this._channel} :!vote (.+)\\s*`);
     
         this._client = net.connect({
             port: 6667,
@@ -80,6 +82,14 @@ class Bot extends EventEmitter {
 
             if(matches) {
                 this.emit(this.NEW_RAFFLER_EVENT, matches[1]);
+            }
+        }
+
+        this._pollHandler = data => {
+            const matches = POLL_PATTERN.exec(data);
+
+            if(matches) {
+                this.emit(this.VOTE_EVENT, matches[1], matches[2]);
             }
         }
     }
@@ -152,12 +162,29 @@ class Bot extends EventEmitter {
         this._aliases = {};
     }
 
-    openRaffle() {
+    openRaffle(announceStart) {
+        if(announceStart) {
+            this.sendMessage('Raffle has started, enter with: !raffle');
+        }
         this._client.on('data', this._raffleHandler);
     }
 
     closeRaffle() {
+        this.sendMessage('Raffle has closed');
         this._client.removeListener('data', this._raffleHandler);
+    }
+
+    openPoll(options) {
+        if(options.length) {
+            this.sendMessage('Raffle has started, vote with: !vote <option>');
+            this.sendMessage(`Options are: ${options.join(', ')}`);
+        }
+        this._client.on('data', this._pollHandler);
+    }
+
+    closePoll() {
+        this.sendMessage('Poll has closed');
+        this._client.removeListener('data', this._pollHandler);
     }
 }
 
