@@ -176,7 +176,7 @@ class Bot extends EventEmitter {
 
     openPoll(options) {
         if(options.length) {
-            this.sendMessage('Raffle has started, vote with: !vote <option>');
+            this.sendMessage('Poll has started, vote with: !vote <option>');
             this.sendMessage(`Options are: ${options.join(', ')}`);
         }
         this._client.on('data', this._pollHandler);
